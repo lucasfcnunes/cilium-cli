@@ -4,7 +4,6 @@ package csr
 import (
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -14,7 +13,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/mail"
 	"net/url"
@@ -23,7 +21,6 @@ import (
 
 	cferr "github.com/cloudflare/cfssl/errors"
 	"github.com/cloudflare/cfssl/helpers"
-	"github.com/cloudflare/cfssl/helpers/derhelpers"
 	"github.com/cloudflare/cfssl/log"
 )
 
@@ -67,7 +64,7 @@ func (kr *KeyRequest) Size() int {
 }
 
 // Generate generates a key as specified in the request. Currently,
-// only ECDSA, RSA and ed25519 algorithms are supported.
+// only ECDSA and RSA are supported.
 func (kr *KeyRequest) Generate() (crypto.PrivateKey, error) {
 	log.Debugf("generate key from request: algo=%s, size=%d", kr.Algo(), kr.Size())
 	switch kr.Algo() {
@@ -92,12 +89,6 @@ func (kr *KeyRequest) Generate() (crypto.PrivateKey, error) {
 			return nil, errors.New("invalid curve")
 		}
 		return ecdsa.GenerateKey(curve, rand.Reader)
-	case "ed25519":
-		seed := make([]byte, ed25519.SeedSize)
-		if _, err := io.ReadFull(rand.Reader, seed); err != nil {
-			return nil, err
-		}
-		return ed25519.NewKeyFromSeed(seed), nil
 	default:
 		return nil, errors.New("invalid algorithm")
 	}
@@ -129,8 +120,6 @@ func (kr *KeyRequest) SigAlgo() x509.SignatureAlgorithm {
 		default:
 			return x509.ECDSAWithSHA1
 		}
-	case "ed25519":
-		return x509.PureEd25519
 	default:
 		return x509.UnknownSignatureAlgorithm
 	}
@@ -260,17 +249,6 @@ func ParseRequest(req *CertificateRequest) (csr, key []byte, err error) {
 			Bytes: key,
 		}
 		key = pem.EncodeToMemory(&block)
-	case ed25519.PrivateKey:
-		key, err = derhelpers.MarshalEd25519PrivateKey(priv)
-		if err != nil {
-			err = cferr.Wrap(cferr.PrivateKeyError, cferr.Unknown, err)
-			return
-		}
-		block := pem.Block{
-			Type:  "Ed25519 PRIVATE KEY",
-			Bytes: key,
-		}
-		key = pem.EncodeToMemory(&block)
 	default:
 		panic("Generate should have failed to produce a valid key.")
 	}
@@ -311,11 +289,16 @@ func getHosts(cert *x509.Certificate) []string {
 	for _, ip := range cert.IPAddresses {
 		hosts = append(hosts, ip.String())
 	}
-	hosts = append(hosts, cert.DNSNames...)
-	hosts = append(hosts, cert.EmailAddresses...)
+	for _, dns := range cert.DNSNames {
+		hosts = append(hosts, dns)
+	}
+	for _, email := range cert.EmailAddresses {
+		hosts = append(hosts, email)
+	}
 	for _, uri := range cert.URIs {
 		hosts = append(hosts, uri.String())
 	}
+
 	return hosts
 }
 
@@ -408,9 +391,9 @@ func Regenerate(priv crypto.Signer, csr []byte) ([]byte, error) {
 	return x509.CreateCertificateRequest(rand.Reader, req, priv)
 }
 
-// GenerateDER creates a new CSR(ASN1 DER encoded) from a CertificateRequest structure and
+// Generate creates a new CSR from a CertificateRequest structure and
 // an existing key. The KeyRequest field is ignored.
-func GenerateDER(priv crypto.Signer, req *CertificateRequest) (csr []byte, err error) {
+func Generate(priv crypto.Signer, req *CertificateRequest) (csr []byte, err error) {
 	sigAlgo := helpers.SignerAlgo(priv)
 	if sigAlgo == x509.UnknownSignatureAlgorithm {
 		return nil, cferr.New(cferr.PrivateKeyError, cferr.Unavailable)
@@ -466,17 +449,6 @@ func GenerateDER(priv crypto.Signer, req *CertificateRequest) (csr []byte, err e
 		err = cferr.Wrap(cferr.CSRError, cferr.BadRequest, err)
 		return
 	}
-	return
-}
-
-// Generate creates a new CSR(PEM encoded) from a CertificateRequest structure and
-// an existing key. The KeyRequest field is ignored.
-func Generate(priv crypto.Signer, req *CertificateRequest) (csr []byte, err error) {
-
-	csr, err = GenerateDER(priv, req)
-	if err != nil {
-		return
-	}
 	block := pem.Block{
 		Type:  "CERTIFICATE REQUEST",
 		Bytes: csr,
@@ -510,6 +482,8 @@ func appendCAInfoToCSR(reqConf *CAConfig, csr *x509.CertificateRequest) error {
 
 // appendCAInfoToCSR appends user-defined extension to a CSR
 func appendExtensionsToCSR(extensions []pkix.Extension, csr *x509.CertificateRequest) error {
-	csr.ExtraExtensions = append(csr.ExtraExtensions, extensions...)
+	for _, extension := range extensions {
+		csr.ExtraExtensions = append(csr.ExtraExtensions, extension)
+	}
 	return nil
 }

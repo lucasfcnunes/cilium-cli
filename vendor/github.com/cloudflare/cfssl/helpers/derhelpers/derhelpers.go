@@ -34,13 +34,13 @@ func ParsePrivateKeyDER(keyDER []byte) (key crypto.Signer, err error) {
 		}
 	}
 
-	switch generalKey := generalKey.(type) {
+	switch generalKey.(type) {
 	case *rsa.PrivateKey:
-		return generalKey, nil
+		return generalKey.(*rsa.PrivateKey), nil
 	case *ecdsa.PrivateKey:
-		return generalKey, nil
+		return generalKey.(*ecdsa.PrivateKey), nil
 	case ed25519.PrivateKey:
-		return generalKey, nil
+		return generalKey.(ed25519.PrivateKey), nil
 	}
 
 	// should never reach here

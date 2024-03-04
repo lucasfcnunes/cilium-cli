@@ -113,10 +113,10 @@ const (
 	// these keys.
 	Encrypted Reason = 100 * (iota + 1) //21XX
 
-	// NotRSAOrECCOrEd25519 indicates that they key is not an RSA or ECC or Ed25519
+	// NotRSAOrECC indicates that they key is not an RSA or ECC
 	// private key; these are the only two private key types supported
 	// at this time by CFSSL.
-	NotRSAOrECCOrEd25519 //22XX
+	NotRSAOrECC //22XX
 
 	// KeyMismatch indicates that the private key does not match
 	// the public key or certificate being presented with the key.
@@ -273,8 +273,8 @@ func New(category Category, reason Reason) *Error {
 			msg = "Failed to parse private key"
 		case Encrypted:
 			msg = "Private key is encrypted."
-		case NotRSAOrECCOrEd25519:
-			msg = "Private key algorithm is not RSA or ECC or Ed25519"
+		case NotRSAOrECC:
+			msg = "Private key algorithm is not RSA or ECC"
 		case KeyMismatch:
 			msg = "Private key does not match public key"
 		case GenerationFailed:
