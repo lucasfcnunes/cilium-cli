@@ -91,6 +91,17 @@ github.com/cilium/cilium/pkg/bgpv1/api
 github.com/cilium/cilium/pkg/bgpv1/types
 github.com/cilium/cilium/pkg/byteorder
 github.com/cilium/cilium/pkg/cidr
+github.com/cilium/cilium/pkg/cilium-cli/api
+github.com/cilium/cilium/pkg/cilium-cli/cmd
+github.com/cilium/cilium/pkg/cilium-cli/connectivity
+github.com/cilium/cilium/pkg/cilium-cli/connectivity/check
+github.com/cilium/cilium/pkg/cilium-cli/connectivity/filters
+github.com/cilium/cilium/pkg/cilium-cli/connectivity/internal/junit
+github.com/cilium/cilium/pkg/cilium-cli/connectivity/manifests/template
+github.com/cilium/cilium/pkg/cilium-cli/connectivity/perf/benchmarks/netperf
+github.com/cilium/cilium/pkg/cilium-cli/connectivity/perf/common
+github.com/cilium/cilium/pkg/cilium-cli/connectivity/sniff
+github.com/cilium/cilium/pkg/cilium-cli/connectivity/tests
 github.com/cilium/cilium/pkg/client
 github.com/cilium/cilium/pkg/clustermesh/types
 github.com/cilium/cilium/pkg/command

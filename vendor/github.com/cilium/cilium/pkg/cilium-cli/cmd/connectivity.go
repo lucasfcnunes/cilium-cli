@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright Authors of Cilium
 
-package cli
+package cmd
 
 import (
 	"context"
@@ -12,22 +12,25 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
-	"time"
 
+	cliAPI "github.com/cilium/cilium-cli/api"
+	"github.com/cilium/cilium-cli/defaults"
+	"github.com/cilium/cilium-cli/sysdump"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/cilium/cilium-cli/connectivity"
-	"github.com/cilium/cilium-cli/connectivity/check"
-	"github.com/cilium/cilium-cli/defaults"
-	"github.com/cilium/cilium-cli/sysdump"
+	"github.com/cilium/cilium/pkg/cilium-cli/api"
+	"github.com/cilium/cilium/pkg/cilium-cli/connectivity"
+	"github.com/cilium/cilium/pkg/cilium-cli/connectivity/check"
+	"github.com/cilium/cilium/pkg/option"
+	"github.com/cilium/cilium/pkg/time"
 )
 
 var errInternal = errors.New("encountered internal error, exiting")
 
-func newCmdConnectivity(hooks Hooks) *cobra.Command {
+func NewCmdConnectivity(hooks api.Hooks) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "connectivity",
+		Use:   "connectivity michi",
 		Short: "Connectivity troubleshooting",
 		Long:  ``,
 	}
@@ -49,8 +52,18 @@ var params = check.Parameters{
 
 var tests []string
 
-func RunE(hooks Hooks) func(cmd *cobra.Command, args []string) error {
+func RunE(hooks api.Hooks) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, _ []string) error {
+		fmt.Println("michi says hello")
+		namespace, ok := cliAPI.GetNamespaceContextValue(cmd.Context())
+		if !ok {
+			return fmt.Errorf("failed to get namespace")
+		}
+		k8sClient, ok := cliAPI.GetK8sClientContextValue(cmd.Context())
+		if !ok {
+			return fmt.Errorf("failed to get k8sClient")
+		}
+
 		params.CiliumNamespace = namespace
 
 		for _, test := range tests {
@@ -115,10 +128,10 @@ func RunE(hooks Hooks) func(cmd *cobra.Command, args []string) error {
 	}
 }
 
-func newCmdConnectivityTest(hooks Hooks) *cobra.Command {
+func newCmdConnectivityTest(hooks api.Hooks) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "test",
-		Short: "Validate connectivity in cluster",
+		Short: "Validate connectivity in cluster  by michi",
 		Long:  ``,
 		RunE:  RunE(hooks),
 	}
@@ -151,7 +164,7 @@ func newCmdConnectivityTest(hooks Hooks) *cobra.Command {
 	cmd.Flags().StringVar(&params.ExternalOtherIP, "external-other-ip", "1.0.0.1", "Other IP to use as external target in connectivity tests")
 	cmd.Flags().StringSliceVar(&params.NodeCIDRs, "node-cidr", nil, "one or more CIDRs that cover all nodes in the cluster")
 	cmd.Flags().StringVar(&params.JunitFile, "junit-file", "", "Generate junit report and write to file")
-	cmd.Flags().StringToStringVar(&params.JunitProperties, "junit-property", map[string]string{}, "Add key=value properties to the generated junit file")
+	cmd.Flags().Var(option.NewNamedMapOptions("kvstore-opts", &params.JunitProperties, nil), "junit-property", "Add key=value properties to the generated junit file")
 	cmd.Flags().BoolVar(&params.SkipIPCacheCheck, "skip-ip-cache-check", true, "Skip IPCache check")
 	cmd.Flags().MarkHidden("skip-ip-cache-check")
 	cmd.Flags().BoolVar(&params.IncludeUnsafeTests, "include-unsafe-tests", false, "Include tests which can modify cluster nodes state")
@@ -202,7 +215,7 @@ func newCmdConnectivityTest(hooks Hooks) *cobra.Command {
 	return cmd
 }
 
-func newCmdConnectivityPerf(hooks Hooks) *cobra.Command {
+func newCmdConnectivityPerf(hooks api.Hooks) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "perf",
 		Short: "Test network performance",
@@ -232,7 +245,7 @@ func newCmdConnectivityPerf(hooks Hooks) *cobra.Command {
 
 func registerCommonFlags(flags *pflag.FlagSet) {
 	flags.BoolVarP(&params.Debug, "debug", "d", false, "Show debug messages")
-	flags.StringToStringVar(&params.NodeSelector, "node-selector", map[string]string{}, "Restrict connectivity pods to nodes matching this label")
+	flags.Var(option.NewNamedMapOptions("node-selector", &params.NodeSelector, nil), "node-selector", "Restrict connectivity pods to nodes matching this label")
 	flags.StringVar(&params.TestNamespace, "test-namespace", defaults.ConnectivityCheckNamespace, "Namespace to perform the connectivity in")
 	flags.Var(&params.DeploymentAnnotations, "deployment-pod-annotations", "Add annotations to the connectivity pods, e.g. '{\"client\":{\"foo\":\"bar\"}}'")
 }

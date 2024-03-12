@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
-	"github.com/cilium/cilium-cli/connectivity/check"
 	"github.com/cilium/cilium-cli/utils/lock"
+
+	"github.com/cilium/cilium/pkg/cilium-cli/connectivity/check"
+	"github.com/cilium/cilium/pkg/inctimer"
+	"github.com/cilium/cilium/pkg/time"
 )
 
 // Mode configures the Sniffer validation mode.
@@ -98,7 +100,7 @@ func Sniff(ctx context.Context, name string, target *check.Pod,
 			}
 
 			return nil, fmt.Errorf("Failed to execute tcpdump: %w", err)
-		case <-time.After(100 * time.Millisecond):
+		case <-inctimer.After(100 * time.Millisecond):
 			line, err := sniffer.stdout.ReadString('\n')
 			if err != nil && !errors.Is(err, io.EOF) {
 				return nil, fmt.Errorf("Failed to read kubectl exec's stdout: %w", err)
@@ -136,12 +138,15 @@ func (sniffer *Sniffer) Validate(ctx context.Context, a *check.Action) {
 		a.Failf("Captured unexpected packets (count=%s)", strings.TrimRight(count.String(), "\n\r"))
 		a.Infof("Capture executed on %s (%s): %s", sniffer.target.String(), sniffer.target.NodeName(), strings.Join(sniffer.cmd, " "))
 
-		cmd := []string{"/bin/sh", "-c", fmt.Sprintf("tcpdump -r %s 2>/dev/null", sniffer.dumpPath)}
-		out, err := sniffer.target.K8sClient.ExecInPod(ctx, sniffer.target.Pod.Namespace, sniffer.target.Pod.Name, "", cmd)
-		if err != nil {
-			a.Fatalf("Failed to retrieve tcpdump output on %s (%s): %s", sniffer.target.String(), sniffer.target.NodeName(), err)
+		// If debug mode is enabled, dump the captured pkts
+		if a.DebugEnabled() {
+			cmd := []string{"/bin/sh", "-c", fmt.Sprintf("tcpdump -r %s 2>/dev/null", sniffer.dumpPath)}
+			out, err := sniffer.target.K8sClient.ExecInPod(ctx, sniffer.target.Pod.Namespace, sniffer.target.Pod.Name, "", cmd)
+			if err != nil {
+				a.Fatalf("Failed to retrieve tcpdump output on %s (%s): %s", sniffer.target.String(), sniffer.target.NodeName(), err)
+			}
+			a.Debugf("Captured packets:\n%s", out.String())
 		}
-		a.Infof("Captured packets:\n%s", out.String())
 	}
 
 	if strings.HasPrefix(count.String(), "0 packets") && sniffer.mode == ModeSanity {
